@@ -35,12 +35,30 @@ The product management team still needs to decide:
 
 ## Project structure
 
-The project is organised into four folders:
-1. **containers** containing the original datasets containing information on driver delays and on rental prices
-2. **data** containing the original datasets containing information on driver delays and on rental prices
-3. **ml_models** contains all the different ML models tried
-4. **mlflow** folder containing analysis of the rental prices datasets, training scripts for several machine learning models and files necessary to create a MLFlow Tracking web server.
-5. [model_final.py](model_final.py) is a notebook containing the latest ML model logged on MLFlow
+- `containers/getaround/`: production Docker stack for VPS deployment (Traefik, FastAPI, PostgreSQL, MLflow, MinIO, Streamlit).
+- `containers/getaround/app/fastapi/app/`: API codebase structured with hexagonal boundaries (`domain`, `application`, `adapters`, `composition`).
+- `streamlit_dev/`: standalone local Streamlit environment.
+- `data/`: source datasets.
+- `ml_models/`: model experiments.
+- `model_final.py`: current model training/logging script.
+
+## VPS deployment quickstart
+
+1. Copy `containers/getaround/.env.example` to `containers/getaround/.env`.
+2. Replace every `change-me` value with strong secrets.
+3. Set DNS records for the hostnames used in `.env`.
+4. Run:
+
+```bash
+cd containers/getaround
+docker compose build
+docker compose up -d
+```
+
+Security notes:
+- Traefik insecure dashboard mode is disabled.
+- MinIO bucket is created without anonymous download policy.
+- Secrets are injected with environment variables and must not be committed.
 
 ## Deliverables
 

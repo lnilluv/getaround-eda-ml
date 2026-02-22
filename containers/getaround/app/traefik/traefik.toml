@@ -16,7 +16,7 @@
 
 [api]
 dashboard = true
-insecure = true
+insecure = false
 
 [providers]
   [providers.docker]

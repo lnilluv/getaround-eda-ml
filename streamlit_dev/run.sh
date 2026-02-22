@@ -1,5 +1,5 @@
-docker run -it\
+docker run --rm \
  -v "$(pwd):/home/app"\
- -e PORT=80\
- -p 4001:80\
+ -e PORT=8501\
+ -p 4001:8501\
  streamlit

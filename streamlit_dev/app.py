@@ -527,6 +527,5 @@ with col2:
 
 st.markdown("- We could conclude that using connect on the mobile cars would be an improvement to reduce the average delay time.")
 st.markdown("- If I had to take a decision, I would put the threshold at 180min for mobile cars renting, it would affect ~6300 of rentals in this dataset.")
-st.markdown("- Doing so would also incite the car owners to use connect instead of mobile".)
+st.markdown("- Doing so would also incite the car owners to use connect instead of mobile.")
 st.markdown("- Given the dataset provided, we can't have proper conclusions for the reasons of cancellations since we can't even know if a cancellation after the late checkout is the reason.")
-
