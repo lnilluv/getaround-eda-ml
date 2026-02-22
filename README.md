@@ -1,101 +1,109 @@
-# Getaround Data Platform: Analytics + ML API + Production Deployment
+# Getaround Data Platform
+
+End-to-end data product implementation: exploratory analytics, machine-learning inference API, and production-oriented deployment on a VPS.
 
 Video walkthrough: https://youtu.be/QUoh_RfaAc8
 
-This project reproduces a realistic product-data use case end to end: data analysis for rental delay policy, machine-learning pricing inference, and production deployment on a VPS with a containerized multi-service stack.
+## Executive summary
 
-## Problem statement
+This repository addresses a real product decision for Getaround: how to reduce rental-chain friction caused by late checkouts without harming utilization.
 
-Getaround rentals can be late at checkout. Late returns create downstream friction for the next renter and can lead to cancellations. The product team needs to choose:
+The implementation includes:
 
-- the minimum time delta threshold between rentals,
-- the feature scope (all cars vs Connect-only),
-- the operational tradeoff between customer experience and utilization/revenue.
+- analytical workflow for delay-threshold and scope decisions,
+- ML inference API for rental price suggestion,
+- model lifecycle infrastructure with MLflow,
+- containerized deployment stack with hardened runtime defaults.
 
-## What this repository delivers
+## Business context
 
-- An interactive analytics dashboard to evaluate delay behavior and policy thresholds.
-- A production FastAPI service exposing a rental price prediction endpoint.
-- MLflow tracking + artifact storage for model lifecycle management.
-- A VPS-ready Docker Compose platform with routing, persistence, and hardened defaults.
+Late checkout events can cascade into customer dissatisfaction and cancellations for the next rental. Product and operations need to tune:
 
-## Live services
+- threshold: minimum delay between consecutive rentals,
+- scope: all cars or selective rollout (for example Connect only),
+- tradeoff: reliability of handoff vs inventory efficiency.
+
+## Deliverables
 
 - Dashboard: [https://streamlit.pryda.dev](https://streamlit.pryda.dev)
-- MLflow: [https://mlflow.pryda.dev](https://mlflow.pryda.dev)
+- MLflow tracking: [https://mlflow.pryda.dev](https://mlflow.pryda.dev)
 - API docs: [https://api.pryda.dev/docs](https://api.pryda.dev/docs)
 
-## Technical scope and complexity
+## Architecture
 
-This is not only an EDA notebook project. It includes:
-
-- Data analysis workflow for threshold decision-making and cancellation-risk interpretation.
-- ML training and model logging workflow.
-- API serving architecture using hexagonal boundaries in FastAPI (`domain`, `application`, `adapters`, `composition`).
-- Container orchestration across routing, backend, dashboard, model tracking, database, and object storage services.
-- Security hardening and dependency remediation for deployment readiness.
-
-## Architecture overview
-
-Runtime topology:
+### Runtime topology
 
 ```text
-Internet
-  -> Traefik (TLS + routing)
-      -> FastAPI service (pricing inference)
-      -> Streamlit dashboard (analytics)
-      -> MLflow tracking server
+Client traffic
+  -> Traefik (TLS termination + routing)
+      -> FastAPI (pricing inference)
+      -> Streamlit (analytics dashboard)
+      -> MLflow (tracking + registry)
 
 FastAPI -> PostgreSQL
-MLflow  -> SQLite backend store + MinIO artifacts
+MLflow  -> SQLite backend + MinIO artifact storage
 ```
 
-FastAPI internal structure:
+### FastAPI service design
+
+Hexagonal boundaries are enforced in the API codebase:
 
 ```text
 adapters -> application -> domain
-         \-> composition root (wiring)
+         \-> composition root (dependency wiring)
 ```
+
+This keeps business logic isolated from infrastructure concerns and improves maintainability and testability.
+
+## Why this project is technically non-trivial
+
+- Combines analytics, ML serving, MLOps, and infrastructure in a single coherent system.
+- Uses explicit architecture boundaries (hexagonal) instead of framework-centric code coupling.
+- Ships as a multi-service deployment target, not only notebooks/scripts.
+- Includes production hardening work: exposed-surface reduction, dependency remediation, and deploy verification.
 
 ## Stack
 
-| Layer | Technologies |
+| Concern | Technologies |
 |---|---|
-| Data and analysis | pandas, numpy, plotly, matplotlib, seaborn |
-| ML and model lifecycle | scikit-learn, xgboost, MLflow |
-| API | FastAPI, uvicorn, pydantic |
+| Data analysis | pandas, numpy, matplotlib, seaborn, plotly |
+| ML | scikit-learn, xgboost |
+| Model lifecycle | MLflow |
+| API serving | FastAPI, uvicorn, pydantic |
 | Dashboard | Streamlit |
-| Data stores | PostgreSQL, SQLite (MLflow metadata), MinIO |
-| Platform and routing | Docker, Docker Compose, Traefik |
-| Security and quality checks | Safety/pip-audit workflow, dependency pinning, hardened container defaults |
+| Storage | PostgreSQL, SQLite (MLflow backend), MinIO |
+| Routing and platform | Traefik, Docker, Docker Compose |
+| Security and verification | pinned dependencies, Safety/pip-audit scans, Docker smoke checks |
 
-## Repository layout
+## Repository structure
 
-- `containers/getaround/`: production deployment stack.
-- `containers/getaround/app/fastapi/app/`: FastAPI service code with hexagonal structure.
-- `containers/getaround/app/streamlit/`: production dashboard app.
+- `containers/getaround/`: production deployment stack and service composition.
+- `containers/getaround/app/fastapi/app/`: FastAPI service with hexagonal layering.
+- `containers/getaround/app/streamlit/`: production dashboard service.
 - `containers/getaround/app/mlflow/`: MLflow service container files.
-- `streamlit_dev/`: local standalone Streamlit app environment.
+- `streamlit_dev/`: local dashboard environment.
 - `data/`: source datasets.
 - `ml_models/`: model experimentation artifacts.
-- `model_final.py`: model training/logging script.
+- `model_final.py`: training/logging workflow script.
 
-## Run locally (production-like stack)
+## Deployment and operations
+
+### Local production-like run
 
 ```bash
 cd containers/getaround
 cp .env.example .env
-# fill all change-me values
+# replace every change-me value
 docker compose build
 docker compose up -d
 ```
 
-## VPS deployment quickstart
+### VPS quickstart
 
-1. Copy `containers/getaround/.env.example` to `containers/getaround/.env`.
-2. Replace all `change-me` values with strong secrets.
-3. Configure DNS records for the hostnames used in `.env`.
-4. Run:
+1. Create `containers/getaround/.env` from `containers/getaround/.env.example`.
+2. Set strong secrets for all sensitive variables.
+3. Configure DNS records for service hostnames.
+4. Build and start:
 
 ```bash
 cd containers/getaround
@@ -103,13 +111,14 @@ docker compose build
 docker compose up -d
 ```
 
-Security highlights:
+### Security posture (current)
 
-- Traefik insecure dashboard mode is disabled.
-- MinIO bucket is initialized without anonymous download policy.
-- Secrets are environment-driven and should never be committed.
+- Traefik insecure dashboard mode disabled.
+- MinIO initialized without anonymous download policy.
+- Secrets externalized through environment variables.
+- Dependency vulnerability workflow integrated into maintenance process.
 
-## API usage example
+## API example
 
 Python:
 
@@ -132,8 +141,12 @@ payload = {
     "winter_tires": True,
 }
 
-r = requests.post("https://api.pryda.dev/prediction", json=payload, timeout=30)
-print(r.json())
+response = requests.post(
+    "https://api.pryda.dev/prediction",
+    json=payload,
+    timeout=30,
+)
+print(response.json())
 ```
 
 curl:
@@ -159,7 +172,7 @@ curl -X POST "https://api.pryda.dev/prediction" \
   }'
 ```
 
-## Notes
+## Notes for reviewers
 
-- The prediction endpoint depends on the configured `MODEL_URI` artifact availability in MLflow.
-- The repository is designed as a portfolio project with production-oriented engineering practices, not just model experimentation.
+- The prediction endpoint requires the configured `MODEL_URI` artifact to be present in MLflow.
+- The project is intentionally scoped as a portfolio-grade production system, not a notebook-only demonstration.
