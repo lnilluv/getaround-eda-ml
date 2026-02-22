@@ -1,52 +1,100 @@
-## Context 
+# Getaround Data Platform: Analytics + ML API + Production Deployment
 
-Video of project: https://youtu.be/QUoh_RfaAc8
+Video walkthrough: https://youtu.be/QUoh_RfaAc8
 
-Getaround is a service where drivers rent cars from owners for a specific time period, from an hour to a few days long. 
+This project reproduces a realistic product-data use case end to end: data analysis for rental delay policy, machine-learning pricing inference, and production deployment on a VPS with a containerized multi-service stack.
 
-When renting a car, clients have to complete a checkin flow at the beginning of the rental and a checkout flow at the end of the rental in order to:
-- assess the state of the car and notify other parties of pre-existing damages or damages that occurred during the rental,
-- compare fuel levels,
-- measure how many kilometers were driven.
+## Problem statement
 
-The checkin and checkout of the rentals can be done with two major flows:
-- Mobile rental agreement on native apps: driver and owner meet and both sign the rental agreement on the owner’s smartphone
-- Connect: the driver doesn’t meet the owner and opens the car with his smartphone
-(The third possibility, paper contract, is negligible).
+Getaround rentals can be late at checkout. Late returns create downstream friction for the next renter and can lead to cancellations. The product team needs to choose:
 
-At the end of the rental, drivers are supposed to bring back the car on time, but it happens from time to time that they are late for the checkout.
+- the minimum time delta threshold between rentals,
+- the feature scope (all cars vs Connect-only),
+- the operational tradeoff between customer experience and utilization/revenue.
 
-Late returns at checkout can generate high friction for the next driver if the car was supposed to be rented again on the same day : Customer service often reports users unsatisfied because they had to wait for the car to come back from the previous rental or users that even had to cancel their rental because the car wasn’t returned on time.
+## What this repository delivers
 
-In order to mitigate those issues it was decided to implement a minimum delta between two rentals. A car won’t be displayed in the search results if the requested checkin or checkout times are too close from an already booked rental.
+- An interactive analytics dashboard to evaluate delay behavior and policy thresholds.
+- A production FastAPI service exposing a rental price prediction endpoint.
+- MLflow tracking + artifact storage for model lifecycle management.
+- A VPS-ready Docker Compose platform with routing, persistence, and hardened defaults.
 
-It solves the late checkout issue but also potentially hurts Getaround/owners revenues: we need to find the right trade off.
+## Live services
 
-The product management team still needs to decide:
-- threshold: how long should the minimum delay be?
-- scope: should the feature be enabled for all cars?, only Connect cars?
+- Dashboard: [https://streamlit.pryda.dev](https://streamlit.pryda.dev)
+- MLflow: [https://mlflow.pryda.dev](https://mlflow.pryda.dev)
+- API docs: [https://api.pryda.dev/docs](https://api.pryda.dev/docs)
 
+## Technical scope and complexity
 
+This is not only an EDA notebook project. It includes:
 
-## Goals of the project
- - Create a web dashboard that will help the product management team to answer the above questions
- - Create a documented online API to suggest optimum car rental price per day for car owners using Machine Learning
+- Data analysis workflow for threshold decision-making and cancellation-risk interpretation.
+- ML training and model logging workflow.
+- API serving architecture using hexagonal boundaries in FastAPI (`domain`, `application`, `adapters`, `composition`).
+- Container orchestration across routing, backend, dashboard, model tracking, database, and object storage services.
+- Security hardening and dependency remediation for deployment readiness.
 
+## Architecture overview
 
-## Project structure
+Runtime topology:
 
-- `containers/getaround/`: production Docker stack for VPS deployment (Traefik, FastAPI, PostgreSQL, MLflow, MinIO, Streamlit).
-- `containers/getaround/app/fastapi/app/`: API codebase structured with hexagonal boundaries (`domain`, `application`, `adapters`, `composition`).
-- `streamlit_dev/`: standalone local Streamlit environment.
+```text
+Internet
+  -> Traefik (TLS + routing)
+      -> FastAPI service (pricing inference)
+      -> Streamlit dashboard (analytics)
+      -> MLflow tracking server
+
+FastAPI -> PostgreSQL
+MLflow  -> SQLite backend store + MinIO artifacts
+```
+
+FastAPI internal structure:
+
+```text
+adapters -> application -> domain
+         \-> composition root (wiring)
+```
+
+## Stack
+
+| Layer | Technologies |
+|---|---|
+| Data and analysis | pandas, numpy, plotly, matplotlib, seaborn |
+| ML and model lifecycle | scikit-learn, xgboost, MLflow |
+| API | FastAPI, uvicorn, pydantic |
+| Dashboard | Streamlit |
+| Data stores | PostgreSQL, SQLite (MLflow metadata), MinIO |
+| Platform and routing | Docker, Docker Compose, Traefik |
+| Security and quality checks | Safety/pip-audit workflow, dependency pinning, hardened container defaults |
+
+## Repository layout
+
+- `containers/getaround/`: production deployment stack.
+- `containers/getaround/app/fastapi/app/`: FastAPI service code with hexagonal structure.
+- `containers/getaround/app/streamlit/`: production dashboard app.
+- `containers/getaround/app/mlflow/`: MLflow service container files.
+- `streamlit_dev/`: local standalone Streamlit app environment.
 - `data/`: source datasets.
-- `ml_models/`: model experiments.
-- `model_final.py`: current model training/logging script.
+- `ml_models/`: model experimentation artifacts.
+- `model_final.py`: model training/logging script.
+
+## Run locally (production-like stack)
+
+```bash
+cd containers/getaround
+cp .env.example .env
+# fill all change-me values
+docker compose build
+docker compose up -d
+```
 
 ## VPS deployment quickstart
 
 1. Copy `containers/getaround/.env.example` to `containers/getaround/.env`.
-2. Replace every `change-me` value with strong secrets.
-3. Set DNS records for the hostnames used in `.env`.
+2. Replace all `change-me` values with strong secrets.
+3. Configure DNS records for the hostnames used in `.env`.
 4. Run:
 
 ```bash
@@ -55,28 +103,22 @@ docker compose build
 docker compose up -d
 ```
 
-Security notes:
+Security highlights:
+
 - Traefik insecure dashboard mode is disabled.
-- MinIO bucket is created without anonymous download policy.
-- Secrets are injected with environment variables and must not be committed.
+- MinIO bucket is initialized without anonymous download policy.
+- Secrets are environment-driven and should never be committed.
 
-## Deliverables
+## API usage example
 
-- Web Dashboard: [https://streamlit.pryda.dev](https://streamlit.pryda.dev)
+Python:
 
-- MLFlow Server: [https://mlflow.pryda.dev](https://mlflow.pryda.dev)
-
-- Documented online API for price prediction: [https://api.pryda.dev/docs](https://api.pryda.dev/docs)
-
-You can test the API by running the following code in python:
-
-````python
-
+```python
 import requests
 
 payload = {
-    "model_key": "Citroën",
-    "mileage": 150411,
+    "model_key": "Citroen",
+    "mileage": 150000,
     "engine_power": 100,
     "fuel": "diesel",
     "paint_color": "green",
@@ -87,36 +129,37 @@ payload = {
     "automatic_car": True,
     "has_getaround_connect": True,
     "has_speed_regulator": True,
-    "winter_tires": True
+    "winter_tires": True,
 }
 
-r = requests.post(
-    "https://api.pryda.dev/predict", json=payload)
+r = requests.post("https://api.pryda.dev/prediction", json=payload, timeout=30)
 print(r.json())
+```
 
+curl:
 
-````
-Or by running the following command in your terminal:
-
-````bash
-
-curl -X 'POST' \
-  'https://api.pryda.dev/predict' \
-  -H 'accept: application/json' \
-  -H 'Content-Type: application/json' \
+```bash
+curl -X POST "https://api.pryda.dev/prediction" \
+  -H "accept: application/json" \
+  -H "Content-Type: application/json" \
   -d '{
-  "model_key": "Citroën",
-  "mileage": 150000,
-  "engine_power": 100,
-  "fuel": "diesel",
-  "paint_color": "green",
-  "car_type": "convertible",
-  "private_parking_available": true,
-  "has_gps": true,
-  "has_air_conditioning": true,
-  "automatic_car": true,
-  "has_getaround_connect": true,
-  "has_speed_regulator": true,
-  "winter_tires": true
-}'
-````
+    "model_key": "Citroen",
+    "mileage": 150000,
+    "engine_power": 100,
+    "fuel": "diesel",
+    "paint_color": "green",
+    "car_type": "convertible",
+    "private_parking_available": true,
+    "has_gps": true,
+    "has_air_conditioning": true,
+    "automatic_car": true,
+    "has_getaround_connect": true,
+    "has_speed_regulator": true,
+    "winter_tires": true
+  }'
+```
+
+## Notes
+
+- The prediction endpoint depends on the configured `MODEL_URI` artifact availability in MLflow.
+- The repository is designed as a portfolio project with production-oriented engineering practices, not just model experimentation.
